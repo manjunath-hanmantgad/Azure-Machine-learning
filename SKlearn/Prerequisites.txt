@@ -1,0 +1,10 @@
+1. Install azure ml sdk for python
+2.create a workspace configuration file.
+
+#1
+
+pip install --upgrade azureml-sdk[explain,automl,notebooks,services]
+
+-- additionally install "pip3 install onnxruntime"
+
+#2 Create config file from ml workspace directly by logging into portal.

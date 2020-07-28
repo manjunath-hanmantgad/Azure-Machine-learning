@@ -1,0 +1,12 @@
+1. Prereq check
+2. Initialise workspace
+3. Create Aml compute
+4. Train model 
+	- Prepare training script
+	- create experiment
+	- create estimator
+	- submit the job
+5. Monitor the run
+6. Tune hyperparameters
+7. Monitor hyperdrive runs
+8.Find and register best model
