@@ -1,0 +1,358 @@
+# creating workspace using azure cli
+
+#1 Connect the CLI to your Azure subscription
+
+az login 
+
+#2 Install the machine learning extension
+
+az extension add -n azure-cli-ml
+
+#3 Create a workspace
+
+# to create a workspace first create a resource group, the rest will be taken care by az ml command.
+# following are created when you run the create workspace command:
+
+applicationInsights
+containerRegistry
+keyVault
+identityPrincipalId
+identityTenantId
+
+#based on use of virtual network we can make the workspace in the required private network.
+
+--pe-name: The name of the private endpoint that is created.
+--pe-auto-approval: Whether private endpoint connections to the workspace should be automatically approved.
+--pe-resource-group: The resource group to create the private endpoint in. Must be the same group that contains the virtual network.
+--pe-vnet-name: The existing virtual network to create the private endpoint in.
+--pe-subnet-name: The name of the subnet to create the private endpoint in. The default value is default
+
+# pe stands for private endpoint
+
+# command to create workspace
+
+az ml workspace create -w ManjuWS1 -g ManjuRG1
+
+
+The output for the above will be:
+
+{
+  "applicationInsights": "/subscriptions/<service-GUID>/resourcegroups/<resource-group-name>/providers/microsoft.insights/components/<application-insight-name>",
+  "containerRegistry": "/subscriptions/<service-GUID>/resourcegroups/<resource-group-name>/providers/microsoft.containerregistry/registries/<acr-name>",
+  "creationTime": "2019-08-30T20:24:19.6984254+00:00",
+  "description": "",
+  "friendlyName": "<workspace-name>",
+  "id": "/subscriptions/<service-GUID>/resourceGroups/<resource-group-name>/providers/Microsoft.MachineLearningServices/workspaces/<workspace-name>",
+  "identityPrincipalId": "<GUID>",
+  "identityTenantId": "<GUID>",
+  "identityType": "SystemAssigned",
+  "keyVault": "/subscriptions/<service-GUID>/resourcegroups/<resource-group-name>/providers/microsoft.keyvault/vaults/<key-vault-name>",
+  "location": "<location>",
+  "name": "<workspace-name>",
+  "resourceGroup": "<resource-group-name>",
+  "storageAccount": "/subscriptions/<service-GUID>/resourcegroups/<resource-group-name>/providers/microsoft.storage/storageaccounts/<storage-account-name>",
+  "type": "Microsoft.MachineLearningServices/workspaces",
+  "workspaceid": "<GUID>"
+}
+
+
+#4 to show the created workspace or to list the available workspaces
+
+az ml workspace list
+
+
+#5 to get information about workspaces 
+
+az ml workspace show -w ManjuWS1 -g ManjuRG1
+
+
+#6 Share a workspace with another user
+
+az ml workspace share -w <workspace-name> -g <resource-group-name> --user <user> --role <role>
+
+#7 When access keys are changed then it takes around 1 hour for them to sync to all the resources. To force teh sync immidiately run
+
+az ml workspace sync-keys -w <workspace-name> -g <resource-group-name>
+
+************************************************************************************************************************************
+
+
+Workspace using REST API 
+
+Create, run, and delete Azure ML resources using REST
+
+#1  Prereq is to setup principal service authentication 
+
+A service principal is used when you need an automated process to authenticate to the service without requiring user interaction. 
+For example, a continuous integration and deployment script that trains and tests a model every time the training code changes.
+You might also use a service principal to retrieve a token to authenticate to a web service, if you don't want to require the end user of the service to authenticate.
+
+# to create service principal run the following commands 
+
+1) az ad sp create-for-rbac --sdk-auth --name ml-auth
+
+# the output of this will return 
+
+{
+    "clientId": "your-client-id",
+    "clientSecret": "your-client-secret",
+    "subscriptionId": "your-sub-id",
+    "tenantId": "your-tenant-id",
+    "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
+    "resourceManagerEndpointUrl": "https://management.azure.com",
+    "activeDirectoryGraphResourceId": "https://graph.windows.net",
+    "sqlManagementEndpointUrl": "https://management.core.windows.net:5555",
+    "galleryEndpointUrl": "https://gallery.azure.com/",
+    "managementEndpointUrl": "https://management.core.windows.net"
+}
+
+2) az ad sp show --id your-client-id # this will Retrieve the details for the service principal by using the clientId value
+
+3) allow service principal to access your workspace using below command. 
+
+az ml workspace share -w your-workspace-name -g your-resource-group-name --user your-sp-object-id --role owner
+
+
+# after running these commands the SP will be created. Now go for next steps.
+
+
+#2 Retrieve a service principal authentication token
+
+curl -X POST https://login.microsoftonline.com/{your-tenant-id}/oauth2/token \
+-d "grant_type=client_credentials&resource=https%3A%2F%2Fmanagement.azure.com%2F&client_id={your-client-id}&client_secret={your-client-secret}" \
+
+# enter here your values : {your-tenant-id}, {your-client-id}, and {your-client-secret}. which you got from #1 
+
+
+#3 Get a list of resource groups associated with your subscription
+# you need to enter {access-token} and {subscription-id}
+
+curl https://management.azure.com/subscriptions/{your-subscription-id}/resourceGroups?api-version=2019-11-01 -H "Authorization:Bearer {your-access-token}"
+
+
+#4 Get your workspaces information 
+
+curl https://management.azure.com/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/providers/Microsoft.MachineLearningServices/workspaces/?api-version=2019-11-01 \
+-H "Authorization:Bearer {your-access-token}"
+
+
+This will output the result 
+
+{
+    "id": "/subscriptions/12345abc-abbc-1b2b-1234-57ab575a5a5a/resourceGroups/DeepLearningResourceGroup/providers/Microsoft.MachineLearningServices/workspaces/my-workspace",
+    "name": "my-workspace",
+    "type": "Microsoft.MachineLearningServices/workspaces",
+    "location": "centralus",
+    "tags": {},
+    "etag": null,
+    "properties": {
+        "friendlyName": "",
+        "description": "",
+        "creationTime": "2020-01-03T19:56:09.7588299+00:00",
+        "storageAccount": "/subscriptions/12345abc-abbc-1b2b-1234-57ab575a5a5a/resourcegroups/DeepLearningResourceGroup/providers/microsoft.storage/storageaccounts/myworkspace0275623111",
+        "containerRegistry": null,
+        "keyVault": "/subscriptions/12345abc-abbc-1b2b-1234-57ab575a5a5a/resourcegroups/DeepLearningResourceGroup/providers/microsoft.keyvault/vaults/myworkspace2525649324",
+        "applicationInsights": "/subscriptions/12345abc-abbc-1b2b-1234-57ab575a5a5a/resourcegroups/DeepLearningResourceGroup/providers/microsoft.insights/components/myworkspace2053523719",
+        "hbiWorkspace": false,
+        "workspaceId": "cba12345-abab-abab-abab-ababab123456",
+        "subscriptionState": null,
+        "subscriptionStatusChangeTimeStampUtc": null,
+        "discoveryUrl": "https://centralus.experiments.azureml.net/discovery"
+    },
+    "identity": {
+        "type": "SystemAssigned",
+        "principalId": "abcdef1-abab-1234-1234-abababab123456",
+        "tenantId": "1fedcba-abab-1234-1234-abababab123456"
+    },
+    "sku": {
+        "name": "Basic",
+        "tier": "Basic"
+    }
+}
+
+
+
+Here Note the value of the discoveryUrl key in the above JSON response.
+
+Now ,If you GET that URL, you'll receive a response something like:
+
+# use POSTMAN to get this data 
+
+{
+  "api": "https://centralus.api.azureml.ms",
+  "catalog": "https://catalog.cortanaanalytics.com",
+  "experimentation": "https://centralus.experiments.azureml.net",
+  "gallery": "https://gallery.cortanaintelligence.com/project",
+  "history": "https://centralus.experiments.azureml.net",
+  "hyperdrive": "https://centralus.experiments.azureml.net",
+  "labeling": "https://centralus.experiments.azureml.net",
+  "modelmanagement": "https://centralus.modelmanagement.azureml.net",
+  "pipelines": "https://centralus.aether.ms",
+  "studiocoreservices": "https://centralus.studioservice.azureml.com"
+}
+
+
+#5  list the compute resources of a workspace with:
+
+curl https://management.azure.com/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/\
+providers/Microsoft.MachineLearningServices/workspaces/{your-workspace-name}/computes?api-version=2019-11-01 \
+-H "Authorization:Bearer {your-access-token}"
+
+
+#6 we can create an compute resource for ML workspace using the below:
+
+curl -X PUT \
+  'https://management.azure.com/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/providers/Microsoft.MachineLearningServices/workspaces/{your-workspace-name}/computes/{your-compute-name}?api-version=2019-11-01' \
+  -H 'Authorization:Bearer {your-access-token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "location": "{your-azure-location}",
+    "properties": {
+        "computeType": "AmlCompute",
+        "properties": {
+            "vmSize": "Standard_D1",
+            "vmPriority": "Dedicated",
+            "scaleSettings": {
+                "maxNodeCount": 1,
+                "minNodeCount": 0,
+                "nodeIdleTimeBeforeScaleDown": "PT30M"
+            }
+        }
+    },
+    "userAccountCredentials": {
+        "adminUserName": "{adminUserName}",
+        "adminUserPassword": "{adminUserPassword}"
+    }
+}'
+
+
+#7 To create workspace using REST use the command : 
+
+curl -X PUT \
+  'https://management.azure.com/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}\
+/providers/Microsoft.MachineLearningServices/workspaces/{your-new-workspace-name}?api-version=2019-11-01' \
+  -H 'Authorization: Bearer {your-access-token}' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "location": "{desired-region}",
+    "properties": {
+        "friendlyName" : "{your-workspace-friendly-name}",
+        "description" : "{your-workspace-description}",
+        "containerRegistry" : "/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/\
+providers/Microsoft.ContainerRegistry/registries/{your-registry-name}",
+        keyVault" : "/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}\
+/providers/Microsoft.Keyvault/vaults/{your-keyvault-name}",
+        "applicationInsights" : "subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/\
+providers/Microsoft.insights/components/{your-application-insights-name}",
+        "storageAccount" : "/subscriptions/{your-subscription-id}/resourceGroups/{your-resource-group}/\
+providers/Microsoft.Storage/storageAccounts/{your-storage-account-name}"
+    },
+    "identity" : {
+        "type" : "systemAssigned"
+    }
+}'
+
+
+*******************************************************************************************************************************************
+
+
+Use an Azure Resource Manager template to create a workspace for Azure Machine Learning
+
+#1 Workspace Resource Manager template
+
+This template creates the following Azure services:
+
+Azure Storage Account
+Azure Key Vault
+Azure Application Insights
+Azure Container Registry
+Azure Machine Learning workspace
+
+
+
+While the template associated with this document creates a new Azure Container Registry, you can also create a new workspace without creating a container registry. 
+One will be created when you perform an operation that requires a container registry. For example, training or deploying a model.
+
+
+# 2 Deploy template
+
+
+a) to deploy a template first create a resource group 
+
+az group create --name "examplegroup" --location "eastus"
+
+b) deploy the template with the following command:
+
+az deployment group create \
+    --name "exampledeployment" \
+    --resource-group "examplegroup" \
+    --template-uri "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-machine-learning-advanced/azuredeploy.json" \
+    --parameters workspaceName="exampleworkspace" location="eastus"
+
+# here template-uri is the deployement url. you can use it custom url when you create your own template.
+
+
+# 3 Deploy an encrypted workspace
+
+The following example template demonstrates how to create a workspace with three settings:
+
+Enable high confidentiality settings for the workspace
+Enable encryption for the workspace
+Uses an existing Azure Key Vault to retrieve customer-managed keys
+
+Apart from this : There are some specific requirements your subscription must meet before using this template:
+
+The Azure Machine Learning application must be a contributor for your Azure subscription.
+You must have an existing Azure Key Vault that contains an encryption key.
+You must have an access policy in the Azure Key Vault that grants get, wrap, and unwrap access to the Azure Cosmos DB application.
+The Azure Key Vault must be in the same region where you plan to create the Azure Machine Learning workspace.
+
+
+a) To add the Azure Machine Learning app as a contributor
+
+run the command 
+
+az role assignment create --role 'Contributor' --assignee-object-id <object-ID> --subscription <subscription-ID>
+# you need object-id , to get object-id run the belwow command 
+
+az ad sp list --display-name "Azure Machine Learning" --query '[].[appDisplayName,objectId]' --output tsv
+
+# after this run the following command 
+
+az deployment group create \
+    --name "exampledeployment" \
+    --resource-group "examplegroup" \
+    --template-uri "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-machine-learning-advanced/azuredeploy.json" \
+    --parameters workspaceName="exampleworkspace" \
+      location="eastus" \
+      encryption_status="Enabled" \
+      cmk_keyvault="/subscriptions/{subscription-guid}/resourceGroups/<resource-group-name>/providers/Microsoft.KeyVault/vaults/<keyvault-name>" \
+      resource_cmk_uri="https://mykeyvault.vault.azure.net/keys/mykey/{guid}" \
+
+
+# 4 to deploy the workspace behind a VNET or a private network use:
+
+
+Only deploy workspace behind private endpoint:
+
+az deployment group create \
+    --name "exampledeployment" \
+    --resource-group "examplegroup" \
+    --template-uri "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-machine-learning-advanced/azuredeploy.json" \
+    --parameters workspaceName="exampleworkspace" \
+      location="eastus" \
+      privateEndpointType="AutoApproval"
+
+
+# Use a new virtual network
+
+az deployment group create \
+    --name "exampledeployment" \
+    --resource-group "examplegroup" \
+    --template-uri "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/201-machine-learning-advanced/azuredeploy.json" \
+    --parameters workspaceName="exampleworkspace" \
+      location="eastus" \
+      vnetOption="new" \
+      vnetName="examplevnet" \
+      storageAccountBehindVNet="true"
+      privateEndpointType="AutoApproval"
